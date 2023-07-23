@@ -14,7 +14,8 @@ const userSchema = new mongoose.Schema({
     enum: ['super', 'admin', 'user'],
     default: 'user', 
   }, 
-  imageUrl: String  
+  imageUrl: String,
+  commission: Number  
 });
 
 userSchema.pre('save', async function (next) {

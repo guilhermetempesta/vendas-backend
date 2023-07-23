@@ -150,7 +150,7 @@ exports.show = async (req, res) => {
 };
 
 exports.store = async (req, res) => {
-  const { email, password, name } = req.body;
+  const { email, password, name, commission } = req.body;
 
   try {
     const emailExists = await User.findOne({ email });
@@ -159,7 +159,7 @@ exports.store = async (req, res) => {
     }
     
     const active = true;
-    const user = await User.create({ email, password, name, active });
+    const user = await User.create({ email, password, name, active, commission });
     res.status(201).json(
       {
         message: "Usuário criado com sucesso!",
@@ -168,7 +168,8 @@ exports.store = async (req, res) => {
           email: user.email, 
           name: user.name,
           active: true,
-
+          role: user.role,
+          commission: user.commission
         }
       }
     );
@@ -181,7 +182,7 @@ exports.store = async (req, res) => {
 exports.update = async (req, res) => {
   try {
     const { id } = req.params;
-    const { email, name, role, active } = req.body;
+    const { email, name, role, active, commission } = req.body;
 
     // Verifica se o usuário com o ID fornecido existe no banco de dados
     const user = await User.findById(id);
@@ -194,6 +195,7 @@ exports.update = async (req, res) => {
     user.name = name;
     user.role = role;
     user.active = active;
+    user.commission = commission;
 
     // Salva as alterações no banco de dados
     await user.save();
@@ -204,6 +206,9 @@ exports.update = async (req, res) => {
         id: user._id,
         email: user.email,
         name: user.name,
+        active: user.active,
+        role: user.role,
+        commission: user.commission
       },
     });
   } catch (error) {
