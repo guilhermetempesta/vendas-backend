@@ -1,10 +1,12 @@
 const express = require('express');
-const authenticate = require('../middlewares/authMiddleware');
+const authenticate = require('../middlewares/authentication');
+const authorize = require('../middlewares/authorization');
 const ReportController = require('../controllers/ReportController');
 const router = express.Router();
 
-router.get('/sales', authenticate, ReportController.getSalesReport);
-router.get('/products', authenticate, ReportController.getProductsReport);
-router.get('/commissions', authenticate, ReportController.getCommissionsReport);
+// Rotas permitidas somente para "admin"
+router.get('/sales', authenticate, authorize(['admin']), ReportController.getSalesReport);
+router.get('/products', authenticate, authorize(['admin']), ReportController.getProductsReport);
+router.get('/commissions', authenticate, authorize(['admin']), ReportController.getCommissionsReport);
 
 module.exports = router;
