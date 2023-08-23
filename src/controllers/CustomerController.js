@@ -97,7 +97,7 @@ exports.destroy = async (req, res) => {
     // Remove o cliente do banco de dados usando o método deleteOne
     await Customer.deleteOne({ _id: id });
 
-    res.json({ message: 'Cliente removido com sucesso!' });
+    res.status(200).json({ message: 'Cliente removido com sucesso!' });
   } catch (error) {
     console.error('Erro ao remover cliente:', error);
     res.status(500).json({ error: 'Erro ao remover cliente' });

@@ -1,6 +1,8 @@
 const mongoose = require('mongoose');
+const { Sequence } = require('./Sequence');
 
 const saleSchema = new mongoose.Schema({
+  code: { type: Number }, // atributo que será uma sequencia
   date: Date,
   customer: { type: mongoose.Types.ObjectId, ref: 'Customer' }, 
   subtotal: Number,
@@ -15,8 +17,31 @@ const saleSchema = new mongoose.Schema({
     addition: Number,
     totalPrice: Number
   }],
-  user: { type: mongoose.Types.ObjectId, ref: 'User' }
-})
+  user: { type: mongoose.Types.ObjectId, ref: 'User' },
+  comments: String
+});
+
+// Função de pré-salvar para gerar o autoincremento
+saleSchema.pre('save', async function (next) {
+  console.log('pre')
+  const doc = this;
+  const sequenceName = 'saleCode';
+
+  try {
+    // Usando a função findOneAndUpdate para gerar o autoincremento
+    const sequenceDoc = await Sequence.findOneAndUpdate(
+      { _id: sequenceName },
+      { $inc: { seq: 1 } },
+      { new: true }
+    );
+
+    // Defina o valor do campo 'code' com o valor atualizado da sequência
+    doc.code = sequenceDoc.seq;
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
 
 const Sale = mongoose.model('Sale', saleSchema);
 

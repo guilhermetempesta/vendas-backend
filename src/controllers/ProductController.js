@@ -1,8 +1,29 @@
 const Product = require('../models/Product');
 
+// exports.index = async (req, res) => {
+//   try {
+//     const products = await Product.find();
+//     res.json(products);
+//   } catch (error) {
+//     console.error('Erro ao buscar produtos:', error);
+//     res.status(500).json({ error: 'Erro ao buscar produtos' });
+//   }
+// };
+
 exports.index = async (req, res) => {
   try {
-    const products = await Product.find();
+    const search = req.query.search; // Obtém o termo de pesquisa da query
+
+    let products;
+
+    if (search) {
+      // Se um termo de pesquisa foi fornecido, filtre os produtos com base nele
+      products = await Product.find({ name: { $regex: search, $options: 'i' } });
+    } else {
+      // Se nenhum termo de pesquisa foi fornecido, busque todos os produtos
+      products = await Product.find();
+    }
+
     res.json(products);
   } catch (error) {
     console.error('Erro ao buscar produtos:', error);
@@ -67,7 +88,7 @@ exports.update = async (req, res) => {
     // Salva as alterações no banco de dados
     await product.save();
 
-    res.json({
+    res.status(200).json({
       message: 'Produto atualizado com sucesso!',
       data: {
         id: product._id,

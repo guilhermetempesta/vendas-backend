@@ -1,4 +1,5 @@
 const { Sale } = require('../models/Sale');
+const { initializeSequence } = require('../utils/commons');
 
 exports.index = async (req, res) => {
   try {
@@ -24,29 +25,37 @@ exports.show = async (req, res) => {
   }
 };
 
-exports.store = async (req, res) => {
+exports.store = async (req, res, next) => {
   const sale = req.body;
   const userId = req.user._id.toString();
+  sale.user = userId;
   try {
-    sale.user = userId;
-    const newSale = await Sale.create(sale);
+    // Inicializa o documento de sequência
+    await initializeSequence();
+
+    // Cria uma nova instância do modelo Sale
+    const newSale = new Sale(sale);
+
+    // Antes de executar o save, chama a função de pré e gera o valor do campo "code"
+    await newSale.save();
+
     res.status(201).json(newSale);
   } catch (error) {
     console.error('Erro ao criar venda:', error);
-    res.status(500).json({ error: 'Erro ao criar venda' });
+    next (error);
   }
 };
 
 exports.update = async (req, res) => {
   const { id } = req.params;
-  const { customer, date, subtotal, discount, addition, total, items } = req.body;
+  const { customer, date, subtotal, discount, addition, total, comments, items } = req.body;
   try {
     const sale = await Sale.findById(id);
     
     if (!sale) {
       return res.status(404).json({ error: 'Venda não encontrada' });
     }
-    if (sale.user.toString() !== req.user.id.toString()) {
+    if (req.user.role !== 'admin' && sale.user.toString() !== req.user.id.toString()) {
       return res.status(404).json({ error: 'Não é permitido alterar vendas de outro usuário.' })
     }
 
@@ -57,8 +66,10 @@ exports.update = async (req, res) => {
     sale.addition = addition;
     sale.total = total;
     sale.items = items;
+    sale.comments = comments;
+
     const saleUpd = await sale.save();
-    res.json(saleUpd);
+    res.status(200).json(saleUpd);
   } catch (error) {
     console.error('Erro ao atualizar venda:', error);
     res.status(500).json({ error: 'Erro ao atualizar venda' });
