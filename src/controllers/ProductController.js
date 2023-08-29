@@ -12,19 +12,36 @@ const Product = require('../models/Product');
 
 exports.index = async (req, res) => {
   try {
-    const search = req.query.search; // Obtém o termo de pesquisa da query
+    const search = req.query.search;
+    const page = parseInt(req.query.page) || 1; // Página atual (padrão: 1)
+    const limit = parseInt(req.query.limit); 
 
+    let query = {};
     let products;
 
     if (search) {
-      // Se um termo de pesquisa foi fornecido, filtre os produtos com base nele
-      products = await Product.find({ name: { $regex: search, $options: 'i' } });
-    } else {
-      // Se nenhum termo de pesquisa foi fornecido, busque todos os produtos
-      products = await Product.find();
+      query = { name: { $regex: search, $options: 'i' } };
     }
 
-    res.json(products);
+    if (limit) {
+      const totalProducts = await Product.countDocuments(query); // Total de produtos
+      const totalPages = Math.ceil(totalProducts / limit); // Total de páginas
+      const skip = (page - 1) * limit;
+  
+      products = await Product.find(query)
+        .skip(skip)
+        .limit(limit);
+        
+      res.json({
+        products,
+        totalPages,
+        currentPage: page,
+      });  
+    } else {
+      products = await Product.find(query);
+      res.json(products);
+    }
+
   } catch (error) {
     console.error('Erro ao buscar produtos:', error);
     res.status(500).json({ error: 'Erro ao buscar produtos' });
