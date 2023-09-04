@@ -1,13 +1,61 @@
 const { Sale } = require('../models/Sale');
 const { initializeSequence } = require('../utils/commons');
+const { startOfDay, endOfDay, parseISO } = require('date-fns');
 
-exports.index = async (req, res) => {
+exports.index = async (req, res, next) => {
   try {
-    const sales = await Sale.find({}).populate(['customer','items.product',{path: 'user', select: 'email name'}]);
-    res.json(sales);
+
+    if (!req.query.initialDate || !req.query.finalDate) {
+      const error = new Error('Período não informado.');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const initialDate = startOfDay(parseISO(req.query.initialDate));
+    const finalDate = endOfDay(parseISO(req.query.finalDate));
+    
+    let pipeline = [
+      {
+        $match: {
+          date: {
+            $gte: initialDate,
+            $lte: finalDate
+          }
+        }
+      }
+    ];
+
+    if (req.query.customer) {
+      pipeline = [
+        ...pipeline,
+        {
+          $lookup: {
+            from: 'customers', // Nome da coleção de Customer
+            localField: 'customer',
+            foreignField: '_id',
+            as: 'customer'
+          }
+        },
+        {
+          $unwind: '$customer'
+        },
+        {
+          $match: {
+            'customer.name': new RegExp(req.query.customer, 'i')
+          }
+        }
+      ];
+    }
+
+    const sales = await Sale.aggregate(pipeline).exec();
+
+    // Preencha os campos relacionados após a execução da agregação
+    await Sale.populate(sales, ['customer','items.product', { path: 'user', select: 'email name' }]);
+
+    res.status(200).json(sales);
   } catch (error) {
     console.error('Erro ao buscar vendas:', error);
-    res.status(500).json({ error: 'Erro ao buscar vendas' });
+    next(error);
   }
 };
 

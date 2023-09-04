@@ -9,8 +9,13 @@ const routes = require('./routes');
 // Crie uma instância do aplicativo Express
 const app = express();
 
+// Configura cors
+const corsOptions = {
+  exposedHeaders: 'Authorization'
+};
+app.use(cors(corsOptions))
+
 // Middlewares globais
-app.use(cors());
 app.use(express.json());
 app.use(passport.initialize());
 
