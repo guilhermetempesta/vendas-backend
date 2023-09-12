@@ -74,10 +74,35 @@ exports.show = async (req, res) => {
 };
 
 exports.store = async (req, res, next) => {
-  const sale = req.body;
   const userId = req.user._id.toString();
+  const sale = req.body; 
+  const {discount, total} = sale;
+
+  let totalDiscountApplied = 0;
   sale.user = userId;
+  
   try {
+    // faz o rateio do desconto para os itens
+    sale.items.forEach((item) => {
+      let itemDiscount = discount * item.totalPrice / total;
+      itemDiscount = parseFloat(itemDiscount.toFixed(2));
+      item.discount = itemDiscount;
+      item.totalPrice -= item.discount;
+      totalDiscountApplied += item.discount;
+    });
+
+    // verifica se há diferença de arredondamento    
+    if (totalDiscountApplied < discount) {
+      const remainingDiscount = discount - totalDiscountApplied;
+      sale.items[0].discount += remainingDiscount;
+      sale.items[0].totalPrice -= remainingDiscount;
+    } else if (totalDiscountApplied > discount) {
+      const excessDiscount = totalDiscountApplied - discount;
+      const lastIndex = sale.items.length - 1;
+      sale.items[lastIndex].discount -= excessDiscount;
+      sale.items[lastIndex].totalPrice += excessDiscount;
+    }
+
     // Inicializa o documento de sequência
     await initializeSequence();
 
