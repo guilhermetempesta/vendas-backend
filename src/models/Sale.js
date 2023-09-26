@@ -18,12 +18,14 @@ const saleSchema = new mongoose.Schema({
     totalPrice: Number
   }],
   user: { type: mongoose.Types.ObjectId, ref: 'User' },
+  canceledAt: Date,
+  canceledBy: { type: mongoose.Types.ObjectId, ref: 'User' },
   comments: String
 });
 
 // Função de pré-salvar para gerar o autoincremento
 saleSchema.pre('save', async function (next) {
-  console.log('pre')
+  // console.log('pre')
   const doc = this;
   const sequenceName = 'saleCode';
 

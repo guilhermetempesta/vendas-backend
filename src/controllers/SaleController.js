@@ -1,5 +1,5 @@
 const { Sale } = require('../models/Sale');
-const { initializeSequence } = require('../utils/commons');
+const { initializeSequence, currentDate } = require('../utils/commons');
 const { startOfDay, endOfDay, parseISO } = require('date-fns');
 
 exports.index = async (req, res, next) => {
@@ -20,7 +20,8 @@ exports.index = async (req, res, next) => {
           date: {
             $gte: initialDate,
             $lte: finalDate
-          }
+          },
+          canceledAt: null
         }
       }
     ];
@@ -129,7 +130,7 @@ exports.update = async (req, res) => {
       return res.status(404).json({ error: 'Venda não encontrada' });
     }
     if (req.user.role !== 'admin' && sale.user.toString() !== req.user.id.toString()) {
-      return res.status(404).json({ error: 'Não é permitido alterar vendas de outro usuário.' })
+      return res.status(401).json({ error: 'Não é permitido alterar vendas de outro usuário.' })
     }
 
     sale.customer = customer;
@@ -153,13 +154,36 @@ exports.destroy = async (req, res) => {
   const { id } = req.params;
   try {
     const sale = await Sale.findById(id);
+    
     if (!sale) {
       return res.status(404).json({ error: 'Venda não encontrada' });
     }
-    await Sale.deleteOne({ _id: id });
-    res.json({ message: 'Venda removida com sucesso!' });
+    if (req.user.role !== 'admin') {
+      return res.status(401).json({ error: 'O usuário não tem permissão para realizar cancelamentos.' })
+    }
+
+    sale.canceledAt = currentDate();
+    sale.canceledBy = req.user.id;
+
+    await sale.save();
+    res.status(200).json({ message: 'Venda cancelada com sucesso!' });
   } catch (error) {
-    console.error('Erro ao remover venda:', error);
-    res.status(500).json({ error: 'Erro ao remover venda' });
+    console.error('Erro ao atualizar venda:', error);
+    res.status(500).json({ error: 'Erro ao atualizar venda' });
   }
 };
+
+// exports.destroy = async (req, res) => {
+//   const { id } = req.params;
+//   try {
+//     const sale = await Sale.findById(id);
+//     if (!sale) {
+//       return res.status(404).json({ error: 'Venda não encontrada' });
+//     }
+//     await Sale.deleteOne({ _id: id });
+//     res.json({ message: 'Venda removida com sucesso!' });
+//   } catch (error) {
+//     console.error('Erro ao remover venda:', error);
+//     res.status(500).json({ error: 'Erro ao remover venda' });
+//   }
+// };
