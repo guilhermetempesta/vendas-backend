@@ -77,7 +77,9 @@ exports.show = async (req, res) => {
 exports.store = async (req, res, next) => {
   const userId = req.user._id.toString();
   const sale = req.body; 
-  const {discount, total} = sale;
+  const {discount, total, date} = sale;
+
+  console.log('date: ', date);
 
   let totalDiscountApplied = 0;
   sale.user = userId;
@@ -107,6 +109,7 @@ exports.store = async (req, res, next) => {
     // Inicializa o documento de sequência
     await initializeSequence();
 
+    console.log(sale);
     // Cria uma nova instância do modelo Sale
     const newSale = new Sale(sale);
 
