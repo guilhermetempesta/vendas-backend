@@ -7,6 +7,6 @@ const router = express.Router();
 // Rotas permitidas somente para "admin"
 router.get('/sales', authenticate, authorize(['admin']), ReportController.getSalesReport);
 router.get('/products', authenticate, authorize(['admin']), ReportController.getProductsReport);
-router.get('/commissions', authenticate, authorize(['admin']), ReportController.getCommissionsReport);
+router.get('/comissions', authenticate, authorize(['admin']), ReportController.getCommissionsReport);
 
 module.exports = router;

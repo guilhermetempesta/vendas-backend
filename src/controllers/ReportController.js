@@ -7,20 +7,20 @@ const { User } = require('../models/User');
 exports.getSalesReport = async (req, res) => {
   try {
     // Recebe os parâmetros do filtro da requisição
-    const { startDate, endDate, userId, customerId, products } = req.query;
+    const { initialDate, finalDate, userId, customerId, products } = req.query;
 
     // Cria um objeto vazio para montar a consulta com os filtros
     const query = {};
 
     // Se foi fornecida uma data de início, adiciona o filtro
-    if (startDate) {
-      query.date = { $gte: new Date(startDate) };
+    if (initialDate) {
+      query.date = { $gte: new Date(initialDate) };
     }
 
     // Se foi fornecida uma data de fim, adiciona o filtro
-    if (endDate) {
+    if (finalDate) {
       // Incrementa um dia na data de fim para incluir as vendas do último dia
-      query.date.$lte = new Date(endDate);
+      query.date.$lte = new Date(finalDate);
     }
 
     // Se foi fornecido um ID de usuário, adiciona o filtro
@@ -45,19 +45,19 @@ exports.getSalesReport = async (req, res) => {
 
 exports.getProductsReport = async (req, res) => {
   try {
-    const { startDate, endDate, userId, productId } = req.query;
+    const { initialDate, finalDate, userId, productId } = req.query;
 
     // Cria um objeto vazio para montar a consulta com os filtros
     const query = {};
 
     // Se foi fornecida uma data de início, adiciona o filtro
-    if (startDate) {
-      query.date = { $gte: new Date(startDate) };
+    if (initialDate) {
+      query.date = { $gte: new Date(initialDate) };
     }
 
     // Se foi fornecida uma data de fim, adiciona o filtro
-    if (endDate) {
-      query.date.$lte = new Date(endDate);
+    if (finalDate) {
+      query.date.$lte = new Date(finalDate);
     }
 
     // Se foi fornecido um ID de usuário, adiciona o filtro
@@ -127,20 +127,20 @@ exports.getProductsReport = async (req, res) => {
 
 exports.getCommissionsReport = async (req, res) => {
   try {
-    const { startDate, endDate, userId } = req.query;
+    const { initialDate, finalDate, userId } = req.query;
 
     // Cria um objeto vazio para montar a consulta com os filtros
     const query = {};
 
     // Se foi fornecida uma data de início, adiciona o filtro
-    if (startDate) {
-      query.date = { $gte: new Date(startDate) };
+    if (initialDate) {
+      query.date = { $gte: new Date(initialDate) };
     }
 
     // Se foi fornecida uma data de fim, adiciona o filtro
-    if (endDate) {
+    if (finalDate) {
       query.date = query.date || {};
-      query.date.$lte = new Date(endDate);
+      query.date.$lte = new Date(finalDate);
     }
 
     // Se foi fornecido um ou mais IDs de usuário, adiciona o filtro
@@ -153,24 +153,39 @@ exports.getCommissionsReport = async (req, res) => {
     const sales = await Sale.find(query).populate('customer user');
 
     // Monta o relatório de comissões
-    const commissionReport = sales.map((sale) => {
+    const commissionReport = {};
+
+    sales.forEach((sale) => {
       const { _id, date, customer, user, total } = sale;
       const { name } = customer;
-      let { name: userName, commission } = user;
-      if (commission===undefined) commission = 0.00;
+      const { _id: userId, name: userName, commission } = user;
+
       const comissionValue = (total * commission) / 100;
 
-      return {
+      if (!commissionReport[userId]) {
+        commissionReport[userId] = {
+          user: { id: userId, name: userName, commission },
+          sales: [],
+          totalSales: 0,
+          totalComission: 0,
+        };
+      }
+
+      commissionReport[userId].sales.push({
         saleId: _id,
         date,
         customer: { id: customer._id, name },
-        user: { id: user._id, name: userName, commission },
         totalValue: total,
         comissionValue,
-      };
+      });
+
+      commissionReport[userId].totalSales += total;
+      commissionReport[userId].totalComission += comissionValue;
     });
 
-    res.json(commissionReport);
+    const result = Object.values(commissionReport);
+
+    res.json(result);
   } catch (error) {
     console.error('Erro ao gerar relatório de comissões:', error);
     res.status(500).json({ error: 'Erro ao gerar relatório de comissões' });
