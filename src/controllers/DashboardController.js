@@ -10,6 +10,19 @@ exports.getSalesCurrentMonth = async (req, res, next) => {
     console.log(format(initialDate, "yyyy-MM-dd'T'HH:mm:ss.SSSXXX", { timeZone }));
     console.log(format(finalDate, "yyyy-MM-dd'T'HH:mm:ss.SSSXXX", { timeZone }));
 
+    // Crie um array com todas as datas entre initialDate e finalDate
+    const allDates = [];
+    let currentDate = new Date(initialDate);
+    while (currentDate <= finalDate) {
+      allDates.push({
+        _id: format(currentDate, "dd/MM/yyyy"),
+        totalSales: 0,
+        totalAmount: 0
+      });
+      currentDate = new Date(currentDate);
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+
     const pipeline = [
       {
         $match: {
@@ -47,12 +60,19 @@ exports.getSalesCurrentMonth = async (req, res, next) => {
 
     const salesByDay = await Sale.aggregate(pipeline).exec();
 
-    res.status(200).json(salesByDay);
+    // Realize a junção dos resultados com as datas completas
+    const mergedResults = allDates.map(date => {
+      const matchingSale = salesByDay.find(sale => sale._id === date._id);
+      return matchingSale || date;
+    });
+
+    res.status(200).json(mergedResults);
   } catch (error) {
     console.error('Erro ao buscar vendas:', error);
     next(error);
   }
 };
+
 
 exports.getTotalSalesCurrentMonth = async (req, res, next) => {
   try {
