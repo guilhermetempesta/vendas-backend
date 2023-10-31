@@ -187,12 +187,23 @@ exports.getLastSales = async (req, res, next) => {
 
 exports.getSalesByMonth = async (req, res, next) => {
   try {
-    // Defina a data inicial para 12 meses atrás a partir da data atual
-    const initialDate = getEndOfToday();
-    initialDate.setMonth(initialDate.getMonth() - 11);
+    const today = new Date();
+    const timeZoneOffset = today.getTimezoneOffset(); // Obtém o offset do fuso horário em minutos
+    
+    const finalDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    finalDate.setHours(23 - timeZoneOffset / 60, 59, 59, 999); // Define a hora para o final do dia em Brasília
+    
+    const initialDate = new Date(finalDate);
+    initialDate.setMonth(initialDate.getMonth() - 12);
+    initialDate.setDate(1); // Define o dia como o primeiro dia do mês em Brasília
+    initialDate.setHours(0, 0, 0, 0); // Define a hora para o início do dia em Brasília
+        
+    // // Defina a data inicial para 12 meses atrás a partir da data atual
+    // const initialDate = getEndOfToday();
+    // initialDate.setMonth(initialDate.getMonth() - 11);
 
-    // Data final é o último dia do mês atual
-    const finalDate = getEndOfToday();
+    // // Data final é o último dia do mês atual
+    // const finalDate = getEndOfToday();
 
     // Array com os últimos 12 meses, incluindo o mês atual
     const monthsArray = [];
@@ -316,6 +327,7 @@ exports.getSalesByMonth = async (req, res, next) => {
     next(error);
   }
 };
+
 
 exports.getSalesBySeller = async (req, res, next) => {
   try {

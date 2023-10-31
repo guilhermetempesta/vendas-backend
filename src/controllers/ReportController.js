@@ -3,6 +3,7 @@ const { Sale } = require('../models/Sale');
 const { User } = require('../models/User');
 const { initializeSequence, currentDate } = require('../utils/commons');
 const { startOfDay, endOfDay, parseISO } = require('date-fns');
+const { timeZone, getFirstDayOfMonth, getEndOfToday } = require('../utils/dateHelpers');
 
 // Método para buscar vendas por período, usuário, cliente e produtos
 exports.getSalesReport = async (req, res) => {
@@ -280,3 +281,250 @@ exports.getCommissionsReport = async (req, res) => {
     res.status(500).json({ error: 'Erro ao gerar relatório de comissões' });
   }
 };
+
+exports.getSalesSummaryByMonth = async (req, res, next) => {
+  try {
+    const today = new Date();
+    const timeZoneOffset = today.getTimezoneOffset(); // Obtém o offset do fuso horário em minutos
+    
+    const finalDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    finalDate.setHours(23 - timeZoneOffset / 60, 59, 59, 999); // Define a hora para o final do dia em Brasília
+    
+    const initialDate = new Date(finalDate);
+    initialDate.setMonth(initialDate.getMonth() - 12);
+    initialDate.setDate(1); // Define o dia como o primeiro dia do mês em Brasília
+    initialDate.setHours(0, 0, 0, 0); // Define a hora para o início do dia em Brasília
+    
+    // console.log(initialDate, finalDate)
+
+    // const initialDate = getEndOfToday();
+    // initialDate.setMonth(initialDate.getMonth() - 11);
+
+    // const finalDate = getEndOfToday();
+
+    const monthsArray = [];
+    let currentDate = new Date(initialDate);
+
+    while (currentDate <= finalDate) {
+      monthsArray.push({
+        year: currentDate.getFullYear(),
+        month: currentDate.getMonth() + 1,
+      });
+
+      currentDate.setMonth(currentDate.getMonth() + 1);
+    }
+
+    const pipeline = [
+      {
+        $match: {
+          date: {
+            $gte: initialDate,
+            $lte: finalDate,
+          },
+          canceledAt: null,
+        },
+      },
+      {
+        $project: {
+          year: { $year: "$date" },
+          month: { $month: "$date" },
+          total: "$total",
+          product: "$product",
+          customer: "$customer",
+          user: "$user",
+        },
+      },
+      {
+        $group: {
+          _id: {
+            year: "$year",
+            month: "$month",
+          },
+          totalSales: { $sum: "$total" },
+        },
+      },
+      {
+        $sort: {
+          "_id": 1,
+        },
+      },
+    ];
+
+    const salesByMonth = await Sale.aggregate(pipeline).exec();
+
+    const result = {};
+
+    for (const month of salesByMonth) {
+      const monthYearKey = month._id.year + "-" + String(month._id.month).padStart(2, "0");
+      result[monthYearKey] = {
+        _id: monthYearKey,
+        name: String(month._id.month).padStart(2, "0") + "/" + month._id.year,
+        total: month.totalSales || 0,
+        topProducts: await getTopProducts(monthYearKey, 3),
+        topCustomers: await getTopCustomers(monthYearKey, 3),
+        topUsers: await getTopUsers(monthYearKey, 3),
+      };
+    }
+
+    const filledMonths = monthsArray.map(async (month) => {
+      const monthYearKey = month.year + "-" + String(month.month).padStart(2, "0");
+      return result[monthYearKey] || {
+        _id: monthYearKey,
+        name: String(month.month).padStart(2, "0") + "/" + month.year,
+        total: 0,
+        topProducts: [],
+        topCustomers: [],
+        topUsers: [],
+      };
+    });
+
+    const filledMonthsData = await Promise.all(filledMonths);
+    res.status(200).json(filledMonthsData);
+  } catch (error) {
+    console.error('Erro ao buscar resumo de vendas por mês:', error);
+    next(error);
+  }
+};
+
+async function getTopProducts(monthYearKey, limit) {
+  
+  const pipeline = [
+    {
+      $match: {
+        date: {
+          $gte: new Date(monthYearKey + "-01"),
+          $lte: new Date(monthYearKey + "-31"),
+        },
+        canceledAt: null,
+      },
+    },
+    {
+      $unwind: "$items",
+    },
+    {
+      $group: {
+        _id: "$items.product",
+        totalAmount: { $sum: "$items.quantity" },
+      },
+    },
+    {
+      $lookup: {
+        from: "products", // Substitua "products" pelo nome da sua coleção de produtos
+        localField: "_id",
+        foreignField: "_id",
+        as: "productDetails",
+      },
+    },
+    {
+      $unwind: "$productDetails",
+    },
+    {
+      $sort: { totalAmount: -1 },
+    },
+    {
+      $limit: limit || 1,
+    },
+    {
+      $project: {
+        name: "$productDetails.name",
+        amount: "$totalAmount",
+      },
+    },
+  ];
+
+  const topProducts = await Sale.aggregate(pipeline).exec();
+  return topProducts;
+}
+
+async function getTopCustomers(monthYearKey, limit) {
+  const pipeline = [
+    {
+      $match: {
+        date: {
+          $gte: new Date(monthYearKey + "-01"),
+          $lte: new Date(monthYearKey + "-31"),
+        },
+        canceledAt: null,
+      },
+    },
+    {
+      $group: {
+        _id: "$customer",
+        totalAmount: { $sum: "$total" },
+      },
+    },
+    {
+      $lookup: {
+        from: "customers", // Substitua "customers" pelo nome da sua coleção de clientes
+        localField: "_id",
+        foreignField: "_id",
+        as: "customerDetails",
+      },
+    },
+    {
+      $unwind: "$customerDetails",
+    },
+    {
+      $sort: { totalAmount: -1 },
+    },
+    {
+      $limit: limit || 1,
+    },
+    {
+      $project: {
+        name: "$customerDetails.name",
+        total: "$totalAmount",
+      },
+    },
+  ];
+
+  const topCustomers = await Sale.aggregate(pipeline).exec();
+  return topCustomers;
+}
+
+async function getTopUsers(monthYearKey, limit) {
+  const pipeline = [
+    {
+      $match: {
+        date: {
+          $gte: new Date(monthYearKey + "-01"),
+          $lte: new Date(monthYearKey + "-31"),
+        },
+        canceledAt: null,
+      },
+    },
+    {
+      $group: {
+        _id: "$user",
+        totalAmount: { $sum: "$total" },
+      },
+    },
+    {
+      $lookup: {
+        from: "users", // Substitua "users" pelo nome da sua coleção de usuários
+        localField: "_id",
+        foreignField: "_id",
+        as: "userDetails",
+      },
+    },
+    {
+      $unwind: "$userDetails",
+    },
+    {
+      $sort: { totalAmount: -1 },
+    },
+    {
+      $limit: limit || 1,
+    },
+    {
+      $project: {
+        name: "$userDetails.name",
+        amount: "$totalAmount",
+      },
+    },
+  ];
+
+  const topUsers = await Sale.aggregate(pipeline).exec();
+  return topUsers;
+}
+
