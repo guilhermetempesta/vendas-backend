@@ -341,6 +341,7 @@ exports.getSalesSummaryByMonth = async (req, res, next) => {
             month: "$month",
           },
           totalSales: { $sum: "$total" },
+          salesQuantity: { $sum: 1 },
         },
       },
       {
@@ -356,10 +357,14 @@ exports.getSalesSummaryByMonth = async (req, res, next) => {
 
     for (const month of salesByMonth) {
       const monthYearKey = month._id.year + "-" + String(month._id.month).padStart(2, "0");
+      const daysInMonth = (finalDate.getDate() - initialDate.getDate() + 1);
+
       result[monthYearKey] = {
         _id: monthYearKey,
         name: String(month._id.month).padStart(2, "0") + "/" + month._id.year,
         total: month.totalSales || 0,
+        salesQuantity: month.salesQuantity || 0,
+        averageSalesValue: (month.salesQuantity > 0) ? month.totalSales / month.salesQuantity : 0,
         topProducts: await getTopProducts(monthYearKey, 3),
         topCustomers: await getTopCustomers(monthYearKey, 3),
         topUsers: await getTopUsers(monthYearKey, 3),
@@ -372,6 +377,8 @@ exports.getSalesSummaryByMonth = async (req, res, next) => {
         _id: monthYearKey,
         name: String(month.month).padStart(2, "0") + "/" + month.year,
         total: 0,
+        salesQuantity: 0,
+        averageSalesValue: 0,
         topProducts: [],
         topCustomers: [],
         topUsers: [],
@@ -387,7 +394,6 @@ exports.getSalesSummaryByMonth = async (req, res, next) => {
 };
 
 async function getTopProducts(monthYearKey, limit) {
-  
   const pipeline = [
     {
       $match: {
@@ -482,6 +488,7 @@ async function getTopCustomers(monthYearKey, limit) {
   return topCustomers;
 }
 
+
 async function getTopUsers(monthYearKey, limit) {
   const pipeline = [
     {
@@ -528,3 +535,100 @@ async function getTopUsers(monthYearKey, limit) {
   return topUsers;
 }
 
+exports.getSalesGroupedByDay = async (req, res, next) => {
+  try {
+    if (!req.query.initialDate || !req.query.finalDate) {
+      const error = new Error('Período não informado.');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const initialDate = startOfDay(parseISO(req.query.initialDate));
+    const finalDate = endOfDay(parseISO(req.query.finalDate));
+
+    const pipeline = [
+      {
+        $match: {
+          date: {
+            $gte: initialDate,
+            $lte: finalDate
+          },
+          canceledAt: null
+        }
+      },
+      {
+        $lookup: {
+          from: 'customers', // Nome da coleção de Customer
+          localField: 'customer',
+          foreignField: '_id',
+          as: 'customer'
+        }
+      },
+      {
+        $lookup: {
+          from: 'users', // Nome da coleção de User
+          localField: 'user',
+          foreignField: '_id',
+          as: 'user'
+        }
+      },
+      {
+        $group: {
+          _id: {
+            year: { $year: '$date' },
+            month: { $month: '$date' },
+            day: { $dayOfMonth: '$date' }
+          },
+          totalSales: { $sum: '$total' },
+          totalAmount: { $sum: 1 }, // Conta o número de vendas
+          sales: {
+            $push: {
+              code: '$code',
+              total: '$total',
+              customer: {
+                name: { $arrayElemAt: ['$customer.name', 0] } // Pega o primeiro elemento do array de customers
+              },
+              user: {
+                name: { $arrayElemAt: ['$user.name', 0] } // Pega o primeiro elemento do array de users
+              }
+            }
+          }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          date: {
+            $dateFromParts: {
+              year: '$_id.year',
+              month: '$_id.month',
+              day: '$_id.day'
+            }
+          },
+          totalSales: 1,
+          totalAmount: 1,
+          sales: 1
+        }
+      },
+      {
+        $addFields: {
+          _id: {
+            $dateToString: { format: '%d/%m/%Y', date: '$date' }
+          }
+        }
+      },
+      {
+        $sort: {
+          date: 1
+        }
+      }
+    ];
+
+    const salesByDay = await Sale.aggregate(pipeline).exec();
+
+    res.status(200).json(salesByDay);
+  } catch (error) {
+    console.error('Erro ao buscar vendas agrupadas por dia:', error);
+    next(error);
+  }
+};
