@@ -73,6 +73,79 @@ exports.getSalesCurrentMonth = async (req, res, next) => {
   }
 };
 
+const { subDays, startOfDay, endOfDay } = require('date-fns');
+
+exports.getSalesLast30Days = async (req, res, next) => {
+  try {
+    const today = new Date();
+    const initialDate = subDays(today, 29); // Subtrai 89 dias para obter os últimos 90 dias.
+    const finalDate = today;
+
+    console.log(format(initialDate, "yyyy-MM-dd'T'HH:mm:ss.SSSXXX", { timeZone }));
+    console.log(format(finalDate, "yyyy-MM-dd'T'HH:mm:ss.SSSXXX", { timeZone }));
+
+    // Crie um array com todas as datas entre initialDate e finalDate
+    const allDates = [];
+    let currentDate = new Date(initialDate);
+    while (currentDate <= finalDate) {
+      allDates.push({
+        _id: format(currentDate, "dd/MM/yyyy"),
+        totalSales: 0,
+        totalAmount: 0
+      });
+      currentDate = new Date(currentDate);
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+
+    const pipeline = [
+      {
+        $match: {
+          date: {
+            $gte: startOfDay(initialDate),
+            $lte: endOfDay(finalDate)
+          },
+          canceledAt: null
+        }
+      },
+      {
+        $addFields: {
+          formattedDate: {
+            $dateToString: {
+              format: '%d/%m/%Y',
+              date: '$date',
+              timezone: timeZone
+            }
+          }
+        }
+      },
+      {
+        $group: {
+          _id: '$formattedDate',
+          totalSales: { $sum: 1 },
+          totalAmount: { $sum: '$total' }
+        }
+      },
+      {
+        $sort: {
+          _id: 1
+        }
+      }
+    ];
+
+    const salesByDay = await Sale.aggregate(pipeline).exec();
+
+    // Realize a junção dos resultados com as datas completas
+    const mergedResults = allDates.map(date => {
+      const matchingSale = salesByDay.find(sale => sale._id === date._id);
+      return matchingSale || date;
+    });
+
+    res.status(200).json(mergedResults);
+  } catch (error) {
+    console.error('Erro ao buscar vendas:', error);
+    next(error);
+  }
+};
 
 exports.getTotalSalesCurrentMonth = async (req, res, next) => {
   try {
@@ -131,16 +204,9 @@ exports.getTotalSalesCurrentMonth = async (req, res, next) => {
 
 exports.getLastSales = async (req, res, next) => {
   try {
-    const initialDate = getFirstDayOfMonth();
-    const finalDate = getEndOfToday();
-
     const pipeline = [
       {
         $match: {
-          date: {
-            $gte: initialDate,
-            $lte: finalDate
-          },
           canceledAt: null
         }
       },
@@ -165,7 +231,7 @@ exports.getLastSales = async (req, res, next) => {
       },
       {
         $lookup: {
-          from: 'users', 
+          from: 'users',
           localField: 'user',
           foreignField: '_id',
           as: 'user'
@@ -177,6 +243,7 @@ exports.getLastSales = async (req, res, next) => {
     ];
 
     const lastSales = await Sale.aggregate(pipeline).exec();
+    await Sale.populate(lastSales, ['customer','items.product', { path: 'user', select: 'email name' }]);
 
     res.status(200).json(lastSales);
   } catch (error) {
