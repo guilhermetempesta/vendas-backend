@@ -161,13 +161,29 @@ exports.recoverPassword = async (req, res, next) => {
 
 exports.index = async (req, res, next) => {
   try {
-    const users = await User.find({}, { password: 0 });
+    const { name, active } = req.query;
+
+    const query = {};
+
+    if (name) {
+      query.name = {
+        $regex: name,
+        $options: 'i',
+      };
+    }
+
+    if (active) {
+      query.active = active;
+    }
+
+    const users = await User.find(query, { password: 0 });
     res.json(users);
   } catch (error) {
     console.error('Erro ao buscar usuários:', error);
     next(error);
   }
 };
+
 
 exports.show = async (req, res, next) => {
   try {

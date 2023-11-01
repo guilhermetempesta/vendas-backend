@@ -2,7 +2,19 @@ const Customer = require('../models/Customer');
 
 exports.index = async (req, res) => {
   try {
-    const customers = await Customer.find();
+    const name = req.query.name;
+
+    let query = {};
+    if (name) {
+      query = {
+        name: {
+          $regex: name, 
+          $options: "i" 
+        }
+      };
+    }
+
+    const customers = await Customer.find(query);
     res.json(customers);
   } catch (error) {
     console.error('Erro ao buscar clientes:', error);

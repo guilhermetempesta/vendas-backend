@@ -1,15 +1,5 @@
 const Product = require('../models/Product');
 
-// exports.index = async (req, res) => {
-//   try {
-//     const products = await Product.find();
-//     res.json(products);
-//   } catch (error) {
-//     console.error('Erro ao buscar produtos:', error);
-//     res.status(500).json({ error: 'Erro ao buscar produtos' });
-//   }
-// };
-
 exports.index = async (req, res) => {
   try {
     const search = req.query.search;
