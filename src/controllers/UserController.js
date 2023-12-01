@@ -202,7 +202,7 @@ exports.show = async (req, res, next) => {
 };
 
 exports.store = async (req, res, next) => {
-  const { email, password, confirmPassword, name, commission } = req.body;
+  const { email, password, confirmPassword, name, commission, role } = req.body;
 
   try {
     if (!name || !email || !password) {
@@ -228,7 +228,7 @@ exports.store = async (req, res, next) => {
     }
 
     const active = true;
-    const user = await User.create({ email, password, name, active, commission });
+    const user = await User.create({ email, password, name, role, active, commission });
     res.status(201).json(
       {
         message: "Usuário criado com sucesso!",
