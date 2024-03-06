@@ -15,3 +15,9 @@ exports.initializeSequence = async () => {
     console.error('Erro ao inicializar a sequência:', error);
   }
 };
+
+exports.currentDate = () => {
+  const currentDate = new Date();
+  currentDate.setTime(currentDate.getTime() - 3 * 60 * 60 * 1000);
+  return currentDate;
+};
