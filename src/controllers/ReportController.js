@@ -53,6 +53,8 @@ exports.getCanceledSalesReport = async (req, res) => {
     // Cria um objeto vazio para montar a consulta com os filtros
     const query = {};
 
+    console.log(initialDate, finalDate)
+
     // Se foi fornecida uma data de início, adiciona o filtro
     if (initialDate) {
       query.canceledAt = { $gte: new Date(initialDate) };
@@ -60,8 +62,9 @@ exports.getCanceledSalesReport = async (req, res) => {
 
     // Se foi fornecida uma data de fim, adiciona o filtro
     if (finalDate) {
-      // Incrementa um dia na data de fim para incluir as vendas do último dia
-      query.canceledAt.$lte = new Date(finalDate);
+      // Adiciona a hora para considerar o dia todo 
+      const finalDateTime = new Date(finalDate+'T23:59:59.000Z');
+      query.canceledAt.$lte = finalDateTime;
     }
 
     if ((!initialDate) && (!finalDate)) {
