@@ -25,24 +25,27 @@ const saleSchema = new mongoose.Schema({
 
 // Função de pré-salvar para gerar o autoincremento
 saleSchema.pre('save', async function (next) {
-  // console.log('pre')
+  // console.log('pre')  
   const doc = this;
-  const sequenceName = 'saleCode';
+  
+  if (!doc.code) {
+    const sequenceName = 'saleCode';
 
-  try {
-    // Usando a função findOneAndUpdate para gerar o autoincremento
-    const sequenceDoc = await Sequence.findOneAndUpdate(
-      { _id: sequenceName },
-      { $inc: { seq: 1 } },
-      { new: true }
-    );
-
-    // Defina o valor do campo 'code' com o valor atualizado da sequência
-    doc.code = sequenceDoc.seq;
-    next();
-  } catch (error) {
-    next(error);
-  }
+    try {
+      // Usando a função findOneAndUpdate para gerar o autoincremento
+      const sequenceDoc = await Sequence.findOneAndUpdate(
+        { _id: sequenceName },
+        { $inc: { seq: 1 } },
+        { new: true }
+      );
+  
+      // Defina o valor do campo 'code' com o valor atualizado da sequência
+      doc.code = sequenceDoc.seq;
+      next();
+    } catch (error) {
+      next(error);
+    }  
+  }   
 });
 
 const Sale = mongoose.model('Sale', saleSchema);

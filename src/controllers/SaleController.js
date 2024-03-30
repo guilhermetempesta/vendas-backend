@@ -137,7 +137,7 @@ exports.update = async (req, res) => {
     }
 
     sale.customer = customer;
-    sale.date = date;
+    // sale.date = date;
     sale.subtotal = subtotal;
     sale.discount = discount;
     sale.addition = addition;
