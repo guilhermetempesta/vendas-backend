@@ -9,6 +9,10 @@ const productSchema = new mongoose.Schema({
   active: {
     type: Boolean,
     default: true
+  },
+  decimal: {
+    type: Boolean,
+    default: false
   }
 });
 

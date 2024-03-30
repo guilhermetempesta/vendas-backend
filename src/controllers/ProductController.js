@@ -53,10 +53,10 @@ exports.show = async (req, res) => {
 };
 
 exports.store = async (req, res) => {
-  const { reference, name, price, cost, description } = req.body;
+  const { reference, name, price, cost, description, decimal } = req.body;
 
   try {
-    const product = await Product.create({ reference, name, price, cost, description });
+    const product = await Product.create({ reference, name, price, cost, description, decimal });
     res.status(201).json({
       message: 'Produto criado com sucesso!',
       data: {
@@ -66,6 +66,7 @@ exports.store = async (req, res) => {
         price: product.price,
         cost: product.cost,
         description: product.description,
+        decimal: product.decimal
       },
     });
   } catch (error) {
@@ -77,7 +78,7 @@ exports.store = async (req, res) => {
 exports.update = async (req, res) => {
   try {
     const { id } = req.params;
-    const { reference, name, price, cost, description } = req.body;
+    const { reference, name, price, cost, description, decimal } = req.body;
 
     // Verifica se o produto com o ID fornecido existe no banco de dados
     const product = await Product.findById(id);
@@ -91,6 +92,7 @@ exports.update = async (req, res) => {
     product.price = price;
     product.cost = cost;
     product.description = description;
+    product.decimal = decimal;
 
     // Salva as alterações no banco de dados
     await product.save();
@@ -104,6 +106,7 @@ exports.update = async (req, res) => {
         price: product.price,
         cost: product.cost,
         description: product.description,
+        decimal: product.decimal
       },
     });
   } catch (error) {
