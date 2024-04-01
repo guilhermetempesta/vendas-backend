@@ -11,4 +11,7 @@ router.get('/last-sales', authenticate, authorize(['admin']), DashboardControlle
 router.get('/sales-by-month', authenticate, authorize(['admin']), DashboardController.getSalesByMonth);
 router.get('/sales-by-seller', authenticate, authorize(['admin']), DashboardController.getSalesBySeller);
 
+router.get('/user-sales-current-month', authenticate, DashboardController.getUserSalesLast30Days);
+router.get('/total-user-sales-month', authenticate, DashboardController.getTotalUserSalesCurrentMonth);
+
 module.exports = router;

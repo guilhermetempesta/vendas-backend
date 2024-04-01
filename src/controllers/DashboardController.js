@@ -478,3 +478,131 @@ exports.getSalesBySeller = async (req, res, next) => {
   }
 };
 
+exports.getUserSalesLast30Days = async (req, res, next) => {
+  try {
+    const today = getEndOfToday();
+    const initialDate = subDays(today, 29); // Subtrai 89 dias para obter os últimos 90 dias.
+    const finalDate = today;
+
+    console.log(format(initialDate, "yyyy-MM-dd'T'HH:mm:ss.SSSXXX", { timeZone }));
+    console.log(format(finalDate, "yyyy-MM-dd'T'HH:mm:ss.SSSXXX", { timeZone }));
+
+    // Crie um array com todas as datas entre initialDate e finalDate
+    const allDates = [];
+    let currentDate = new Date(initialDate);
+    while (currentDate <= finalDate) {
+      allDates.push({
+        _id: format(currentDate, "dd/MM/yyyy"),
+        totalSales: 0,
+        totalAmount: 0
+      });
+      currentDate = new Date(currentDate);
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+
+    const pipeline = [
+      {
+        $match: {
+          date: {
+            $gte: startOfDay(initialDate),
+            $lte: endOfDay(finalDate)
+          },
+          canceledAt: null,
+          user: req.user._id
+        }
+      },
+      {
+        $addFields: {
+          formattedDate: {
+            $dateToString: {
+              format: '%d/%m/%Y',
+              date: '$date',
+              timezone: timeZone
+            }
+          }
+        }
+      },
+      {
+        $group: {
+          _id: '$formattedDate',
+          totalSales: { $sum: 1 },
+          totalAmount: { $sum: '$total' }
+        }
+      },
+      {
+        $sort: {
+          _id: 1
+        }
+      }
+    ];
+
+    const salesByDay = await Sale.aggregate(pipeline).exec();
+
+    // Realize a junção dos resultados com as datas completas
+    const mergedResults = allDates.map(date => {
+      const matchingSale = salesByDay.find(sale => sale._id === date._id);
+      return matchingSale || date;
+    });
+
+    res.status(200).json(mergedResults);
+  } catch (error) {
+    console.error('Erro ao buscar vendas:', error);
+    next(error);
+  }
+};
+
+exports.getTotalUserSalesCurrentMonth = async (req, res, next) => {
+  try {
+    const initialDate = getFirstDayOfMonth();
+    const finalDate = getEndOfToday();
+
+    const pipeline = [
+      {
+        $match: {
+          date: {
+            $gte: initialDate,
+            $lte: finalDate
+          },
+          canceledAt: null,
+          user: req.user._id
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          totalSales: { $sum: '$total' },
+          salesQuantity: { $sum: 1 }
+        }
+      }
+    ];
+
+    const result = await Sale.aggregate(pipeline).exec();
+
+    if (result.length > 0) {
+      const totalSales = result[0].totalSales || 0;
+      const salesQuantity = result[0].salesQuantity || 0;
+      const salesAverage = salesQuantity > 0 ? totalSales / salesQuantity : 0;
+
+      // Calcula a média de vendas por dia
+      const daysInMonth = (finalDate.getDate() - initialDate.getDate() + 1);
+      const salesAveragePerDay = daysInMonth > 0 ? totalSales / daysInMonth : 0;
+
+      res.status(200).json({
+        totalSales,
+        salesQuantity,
+        salesAverage,
+        salesAveragePerDay
+      });
+    } else {
+      res.status(200).json({
+        totalSales: 0,
+        salesQuantity: 0,
+        salesAverage: 0,
+        salesAveragePerDay: 0
+      });
+    }
+  } catch (error) {
+    console.error('Erro ao buscar vendas:', error);
+    next(error);
+  }
+};

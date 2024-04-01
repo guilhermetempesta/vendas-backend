@@ -11,5 +11,7 @@ router.get('/products', authenticate, authorize(['admin']), ReportController.get
 router.get('/comissions', authenticate, authorize(['admin']), ReportController.getCommissionsReport);
 router.get('/sales-summary', authenticate, authorize(['admin']), ReportController.getSalesSummaryByMonth);
 router.get('/sales-by-day', authenticate, authorize(['admin']), ReportController.getSalesGroupedByDay);
+router.get('/user-sales', authenticate, ReportController.getUserSalesReport);
+router.get('/user-sales-by-day', authenticate, ReportController.getUserSalesGroupedByDay);
 
 module.exports = router;

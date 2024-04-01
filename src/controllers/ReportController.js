@@ -5,39 +5,28 @@ const { initializeSequence, currentDate } = require('../utils/commons');
 const { startOfDay, endOfDay, parseISO } = require('date-fns');
 const { timeZone, getFirstDayOfMonth, getEndOfToday } = require('../utils/dateHelpers');
 
-// Método para buscar vendas por período, usuário, cliente e produtos
 exports.getSalesReport = async (req, res) => {
   try {
-    // Recebe os parâmetros do filtro da requisição
     const { initialDate, finalDate, userId, customerId } = req.query;
-
-    // Cria um objeto vazio para montar a consulta com os filtros
     const query = {};
 
-    // Se foi fornecida uma data de início, adiciona o filtro
     if (initialDate) {
-      query.date = { $gte: new Date(initialDate) };
+      query.date = { $gte: new Date(`${initialDate}T00:00:00.000Z`) };
     }
 
-    // Se foi fornecida uma data de fim, adiciona o filtro
     if (finalDate) {
-      // Incrementa um dia na data de fim para incluir as vendas do último dia
-      query.date.$lte = new Date(finalDate);
+      query.date.$lte = new Date(`${finalDate}T23:59:59.999Z`);
     }
 
-    // Se foi fornecido um ID de usuário, adiciona o filtro
     if (userId) {
       query.user = userId;
     }
 
-    // Se foi fornecido um ID de cliente, adiciona o filtro
     if (customerId) {
       query.customer = customerId;
     }
 
-    // Realiza a consulta no banco de dados
     const sales = await Sale.find(query).populate('customer user', '-password').populate('items.product');
-
     res.json(sales);
   } catch (error) {
     console.error('Erro ao buscar relatório de vendas:', error);
@@ -557,6 +546,135 @@ exports.getSalesGroupedByDay = async (req, res, next) => {
             $lte: finalDate
           },
           canceledAt: null
+        }
+      },
+      {
+        $lookup: {
+          from: 'customers', // Nome da coleção de Customer
+          localField: 'customer',
+          foreignField: '_id',
+          as: 'customer'
+        }
+      },
+      {
+        $lookup: {
+          from: 'users', // Nome da coleção de User
+          localField: 'user',
+          foreignField: '_id',
+          as: 'user'
+        }
+      },
+      {
+        $group: {
+          _id: {
+            year: { $year: '$date' },
+            month: { $month: '$date' },
+            day: { $dayOfMonth: '$date' }
+          },
+          totalSales: { $sum: '$total' },
+          totalAmount: { $sum: 1 }, // Conta o número de vendas
+          sales: {
+            $push: {
+              code: '$code',
+              total: '$total',
+              customer: {
+                name: { $arrayElemAt: ['$customer.name', 0] } // Pega o primeiro elemento do array de customers
+              },
+              user: {
+                name: { $arrayElemAt: ['$user.name', 0] } // Pega o primeiro elemento do array de users
+              }
+            }
+          }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          date: {
+            $dateFromParts: {
+              year: '$_id.year',
+              month: '$_id.month',
+              day: '$_id.day'
+            }
+          },
+          totalSales: 1,
+          totalAmount: 1,
+          sales: 1
+        }
+      },
+      {
+        $addFields: {
+          _id: {
+            $dateToString: { format: '%d/%m/%Y', date: '$date' }
+          }
+        }
+      },
+      {
+        $sort: {
+          date: 1
+        }
+      }
+    ];
+
+    const salesByDay = await Sale.aggregate(pipeline).exec();
+
+    res.status(200).json(salesByDay);
+  } catch (error) {
+    console.error('Erro ao buscar vendas agrupadas por dia:', error);
+    next(error);
+  }
+};
+
+exports.getUserSalesReport = async (req, res) => {
+  try {
+    const { initialDate, finalDate, customerId } = req.query;
+    const query = {};
+
+    query.user = req.user._id;
+
+    if (initialDate) {
+      query.date = { $gte: new Date(`${initialDate}T00:00:00.000Z`) };
+    }
+
+    if (finalDate) {
+      query.date.$lte = new Date(`${finalDate}T23:59:59.999Z`);
+    }
+
+    if (customerId) {
+      query.customer = customerId;
+    }
+
+    const sales = await Sale.find(query).populate('customer user', '-password').populate('items.product');
+    console.log(sales)
+    res.json(sales);
+  } catch (error) {
+    console.error('Erro ao buscar relatório de vendas:', error);
+    res.status(500).json({ error: 'Erro ao buscar relatório de vendas' });
+  }
+};
+
+exports.getUserSalesGroupedByDay = async (req, res, next) => {
+  try {
+    if (!req.query.initialDate || !req.query.finalDate) {
+      const error = new Error('Período não informado.');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const initialDate = startOfDay(parseISO(req.query.initialDate));
+    const finalDate = endOfDay(parseISO(req.query.finalDate));
+    const userId = req.user._id;
+    console.log(userId);
+
+    const pipeline = [
+      {
+        $match: {
+          date: {
+            $gte: initialDate,
+            $lte: finalDate
+          },
+          canceledAt: null,
+          user: userId
         }
       },
       {

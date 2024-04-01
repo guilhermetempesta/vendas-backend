@@ -8,7 +8,7 @@ const router = express.Router();
 router.get('/', authenticate, SaleController.index);
 router.get('/:id', authenticate, SaleController.show);
 router.post('/', authenticate, SaleController.store);
-router.put('/:id', authenticate, authorize(['admin']), SaleController.update);
+router.put('/:id', authenticate, SaleController.update);
 router.delete('/:id', authenticate, authorize(['admin']), SaleController.destroy);
 
 module.exports = router;
