@@ -36,41 +36,29 @@ exports.getSalesReport = async (req, res) => {
 
 exports.getCanceledSalesReport = async (req, res) => {
   try {
-    // Recebe os parâmetros do filtro da requisição
     const { initialDate, finalDate, userId, customerId } = req.query;
-
-    // Cria um objeto vazio para montar a consulta com os filtros
     const query = {};
 
     console.log(initialDate, finalDate)
-
-    // Se foi fornecida uma data de início, adiciona o filtro
     if (initialDate) {
-      query.canceledAt = { $gte: new Date(initialDate) };
+      query.date = { $gte: new Date(`${initialDate}T00:00:00.000Z`) };
     }
-
-    // Se foi fornecida uma data de fim, adiciona o filtro
     if (finalDate) {
-      // Adiciona a hora para considerar o dia todo 
-      const finalDateTime = new Date(finalDate+'T23:59:59.000Z');
-      query.canceledAt.$lte = finalDateTime;
+      query.date.$lte = new Date(`${finalDate}T23:59:59.999Z`);
     }
 
     if ((!initialDate) && (!finalDate)) {
       query.canceledAt = { $ne: null }
     }
 
-    // Se foi fornecido um ID de usuário, adiciona o filtro
     if (userId) {
       query.user = userId;
     }
 
-    // Se foi fornecido um ID de cliente, adiciona o filtro
     if (customerId) {
       query.customer = customerId;
     }
 
-    // Realiza a consulta no banco de dados
     const sales = await Sale.find(query).populate('customer user', '-password').populate('items.product');
 
     res.json(sales);
@@ -210,31 +198,25 @@ exports.getProductsReport = async (req, res) => {
 exports.getCommissionsReport = async (req, res) => {
   try {
     const { initialDate, finalDate, userId } = req.query;
-
-    // Cria um objeto vazio para montar a consulta com os filtros
     const query = {};
 
-    // Se foi fornecida uma data de início, adiciona o filtro
     if (initialDate) {
-      query.date = { $gte: new Date(initialDate) };
+      query.date = { $gte: new Date(`${initialDate}T00:00:00.000Z`) };
     }
 
-    // Se foi fornecida uma data de fim, adiciona o filtro
     if (finalDate) {
-      query.date = query.date || {};
-      query.date.$lte = new Date(finalDate);
+      query.date.$lte = new Date(`${finalDate}T23:59:59.999Z`);
     }
 
-    // Se foi fornecido um ou mais IDs de usuário, adiciona o filtro
     if (userId) {
       const userIds = Array.isArray(userId) ? userId : [userId];
       query.user = { $in: userIds };
     }
 
-    // Realiza a consulta no banco de dados
+    query.canceledAt = null;
+
     const sales = await Sale.find(query).populate('customer user');
 
-    // Monta o relatório de comissões
     const commissionReport = {};
 
     sales.forEach((sale) => {
@@ -242,7 +224,7 @@ exports.getCommissionsReport = async (req, res) => {
       const { name } = customer;
       const { _id: userId, name: userName, commission } = user;
 
-      const comissionValue = (total * commission) / 100;
+      const comissionValue = (commission>0) ? ((total * commission) / 100) : 0;
 
       if (!commissionReport[userId]) {
         commissionReport[userId] = {
@@ -287,13 +269,6 @@ exports.getSalesSummaryByMonth = async (req, res, next) => {
     initialDate.setDate(1); // Define o dia como o primeiro dia do mês em Brasília
     initialDate.setHours(0, 0, 0, 0); // Define a hora para o início do dia em Brasília
     
-    // console.log(initialDate, finalDate)
-
-    // const initialDate = getEndOfToday();
-    // initialDate.setMonth(initialDate.getMonth() - 11);
-
-    // const finalDate = getEndOfToday();
-
     const monthsArray = [];
     let currentDate = new Date(initialDate);
 
