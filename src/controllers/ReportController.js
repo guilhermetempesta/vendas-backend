@@ -188,7 +188,8 @@ exports.getProductsReport = async (req, res) => {
         totalCost: parseFloat(totalCost.toFixed(2)),
         totalSales: parseFloat(totalSales.toFixed(2)),
         resultValue: parseFloat((totalSales - totalCost).toFixed(2)),
-        resultPercent: parseFloat((((totalSales - totalCost) / totalCost) * 100).toFixed(2)),
+        resultPercent: 
+          (totalSales>0 && totalCost>0) ? parseFloat((((totalSales - totalCost) / totalCost) * 100).toFixed(2)) : 0.00,
       },
     };
     res.json(result);
