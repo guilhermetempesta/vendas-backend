@@ -162,11 +162,13 @@ exports.getProductsReport = async (req, res) => {
     // Calcular o percentual de lucro corretamente
     for (const productId in productsData) {
       productsData[productId].resultPercent = 
-        (productsData[productId].totalCost > 0) ? (productsData[productId].resultValue / productsData[productId].totalCost) * 100 : 0;
+        (productsData[productId].totalCost > 0 && productsData[productId].resultValue > 0) 
+          ? (productsData[productId].resultValue / productsData[productId].totalCost) * 100 : 0;
       productsData[productId].resultPercent = parseFloat(productsData[productId].resultPercent.toFixed(2));
       productsData[productId].subTotalSales = parseFloat(productsData[productId].subTotalSales.toFixed(2));
       productsData[productId].averagePrice = 
-        (productsData[productId].soldAmount) ? productsData[productId].subTotalSales / productsData[productId].soldAmount : 0;
+        (productsData[productId].soldAmount > 0 && productsData[productId].subTotalSales > 0) 
+          ? productsData[productId].subTotalSales / productsData[productId].soldAmount : 0;
       productsData[productId].averagePrice = parseFloat(productsData[productId].averagePrice.toFixed(2)); 
       productsData[productId].totalDiscount = parseFloat(productsData[productId].totalDiscount.toFixed(2));
       productsData[productId].totalSales = parseFloat(productsData[productId].totalSales.toFixed(2));
