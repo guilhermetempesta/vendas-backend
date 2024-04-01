@@ -181,6 +181,9 @@ exports.getProductsReport = async (req, res) => {
     // Converter o objeto em uma lista de produtos
     const productList = Object.values(productsData);
 
+    const summaryResultPercent = 
+      (totalSales>0 && totalCost>0) ? ((totalSales - totalCost) / totalCost * 100) : 0.00;
+
     // Calcular o resumo
     const result = {
       products: productList,
@@ -188,8 +191,7 @@ exports.getProductsReport = async (req, res) => {
         totalCost: parseFloat(totalCost.toFixed(2)),
         totalSales: parseFloat(totalSales.toFixed(2)),
         resultValue: parseFloat((totalSales - totalCost).toFixed(2)),
-        resultPercent: 
-          (totalSales>0 && totalCost>0) ? parseFloat((((totalSales - totalCost) / totalCost) * 100).toFixed(2)) : 0.00,
+        resultPercent: parseFloat(summaryResultPercent.toFixed(2)) 
       },
     };
     res.json(result);
