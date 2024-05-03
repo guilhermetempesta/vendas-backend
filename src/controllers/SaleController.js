@@ -77,24 +77,40 @@ exports.show = async (req, res) => {
 exports.store = async (req, res, next) => {
   const userId = req.user._id.toString();
   const sale = req.body; 
-  const {discount, total, date} = sale;
+  const {addition, discount, total, date} = sale;
 
+  console.log(sale)
   console.log('date: ', date);
 
   let totalDiscountApplied = 0;
+  let totalAdditionApplied = 0;
   sale.user = userId;
   
   try {
-    // faz o rateio do desconto para os itens
+    // faz o rateio do desconto e do acréscimo para os itens
     sale.items.forEach((item) => {
-      let itemDiscount = discount * item.totalPrice / total;
-      itemDiscount = parseFloat(itemDiscount.toFixed(2));
-      item.discount = itemDiscount;
-      item.totalPrice -= item.discount;
-      totalDiscountApplied += item.discount;
+      const itemFullPrice = item.totalPrice;
+      let itemDiscount = discount * itemFullPrice / total;
+      let itemAddition = addition * item.totalPrice / total;
+
+      // calcula desconto
+      if (itemDiscount > 0 ) {
+        itemDiscount = parseFloat(itemDiscount.toFixed(2));
+        item.discount = itemDiscount;
+        item.totalPrice -= item.discount;
+        totalDiscountApplied += item.discount;  
+      }
+      
+      // calcula acrescimo
+      if (itemAddition > 0) {
+        itemAddition = parseFloat(itemAddition.toFixed(2));
+        item.addition = itemAddition;
+        item.totalPrice += item.addition;
+        totalAdditionApplied += item.addition;
+      }            
     });
 
-    // verifica se há diferença de arredondamento    
+    // verifica se há diferença de arredondamento no desconto   
     if (totalDiscountApplied < discount) {
       const remainingDiscount = discount - totalDiscountApplied;
       sale.items[0].discount += remainingDiscount;
@@ -104,6 +120,18 @@ exports.store = async (req, res, next) => {
       const lastIndex = sale.items.length - 1;
       sale.items[lastIndex].discount -= excessDiscount;
       sale.items[lastIndex].totalPrice += excessDiscount;
+    }
+
+    // verifica se há diferença de arredondamento no acréscimo
+    if (totalAdditionApplied < addition) {
+      const remainingAddition = addition - totalAdditionApplied;
+      sale.items[0].addition += remainingAddition;
+      sale.items[0].totalPrice += remainingAddition;
+    } else if (totalAdditionApplied > addition) {
+      const excessDiscount = totalAdditionApplied - addition;
+      const lastIndex = sale.items.length - 1;
+      sale.items[lastIndex].addition -= excessDiscount;
+      sale.items[lastIndex].totalPrice -= excessDiscount;
     }
 
     // Inicializa o documento de sequência
@@ -175,18 +203,3 @@ exports.destroy = async (req, res) => {
     res.status(500).json({ error: 'Erro ao atualizar venda' });
   }
 };
-
-// exports.destroy = async (req, res) => {
-//   const { id } = req.params;
-//   try {
-//     const sale = await Sale.findById(id);
-//     if (!sale) {
-//       return res.status(404).json({ error: 'Venda não encontrada' });
-//     }
-//     await Sale.deleteOne({ _id: id });
-//     res.json({ message: 'Venda removida com sucesso!' });
-//   } catch (error) {
-//     console.error('Erro ao remover venda:', error);
-//     res.status(500).json({ error: 'Erro ao remover venda' });
-//   }
-// };
