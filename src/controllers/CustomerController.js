@@ -106,6 +106,12 @@ exports.destroy = async (req, res) => {
       return res.status(404).json({ error: 'Cliente não encontrado' });
     }
 
+    // Verifica se o cliente possui vendas associadas
+    const customerHasSales = await hasSales(id);
+    if (customerHasSales) {
+      return res.status(403).json({ error: 'Não é permitido excluir um cliente com vendas vinculadas.' });
+    }
+
     // Remove o cliente do banco de dados usando o método deleteOne
     await Customer.deleteOne({ _id: id });
 
@@ -113,5 +119,17 @@ exports.destroy = async (req, res) => {
   } catch (error) {
     console.error('Erro ao remover cliente:', error);
     res.status(500).json({ error: 'Erro ao remover cliente' });
+  }
+};
+
+const hasSales = async (customerId) => {
+  try {
+    // Verifica se existem vendas associadas ao cliente pelo ID
+    const {Sale} = require('../models/Sale');
+    const salesCount = await Sale.find({ customer: customerId });
+    return salesCount.length > 0;
+  } catch (error) {
+    console.error('Erro ao verificar vendas do cliente:', error);
+    throw new Error('Erro ao verificar vendas do cliente');
   }
 };

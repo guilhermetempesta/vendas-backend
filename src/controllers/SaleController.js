@@ -82,64 +82,17 @@ exports.store = async (req, res, next) => {
   console.log(sale)
   console.log('date: ', date);
 
-  let totalDiscountApplied = 0;
-  let totalAdditionApplied = 0;
   sale.user = userId;
-  
+
   try {
-    // faz o rateio do desconto e do acréscimo para os itens
-    sale.items.forEach((item) => {
-      const itemFullPrice = item.totalPrice;
-      let itemDiscount = discount * itemFullPrice / total;
-      let itemAddition = addition * item.totalPrice / total;
-
-      // calcula desconto
-      if (itemDiscount > 0 ) {
-        itemDiscount = parseFloat(itemDiscount.toFixed(2));
-        item.discount = itemDiscount;
-        item.totalPrice -= item.discount;
-        totalDiscountApplied += item.discount;  
-      }
-      
-      // calcula acrescimo
-      if (itemAddition > 0) {
-        itemAddition = parseFloat(itemAddition.toFixed(2));
-        item.addition = itemAddition;
-        item.totalPrice += item.addition;
-        totalAdditionApplied += item.addition;
-      }            
-    });
-
-    // verifica se há diferença de arredondamento no desconto   
-    if (totalDiscountApplied < discount) {
-      const remainingDiscount = discount - totalDiscountApplied;
-      sale.items[0].discount += remainingDiscount;
-      sale.items[0].totalPrice -= remainingDiscount;
-    } else if (totalDiscountApplied > discount) {
-      const excessDiscount = totalDiscountApplied - discount;
-      const lastIndex = sale.items.length - 1;
-      sale.items[lastIndex].discount -= excessDiscount;
-      sale.items[lastIndex].totalPrice += excessDiscount;
-    }
-
-    // verifica se há diferença de arredondamento no acréscimo
-    if (totalAdditionApplied < addition) {
-      const remainingAddition = addition - totalAdditionApplied;
-      sale.items[0].addition += remainingAddition;
-      sale.items[0].totalPrice += remainingAddition;
-    } else if (totalAdditionApplied > addition) {
-      const excessDiscount = totalAdditionApplied - addition;
-      const lastIndex = sale.items.length - 1;
-      sale.items[lastIndex].addition -= excessDiscount;
-      sale.items[lastIndex].totalPrice -= excessDiscount;
-    }
-
     // Inicializa o documento de sequência
     await initializeSequence();
 
-    console.log(sale);
     // Cria uma nova instância do modelo Sale
     const newSale = new Sale(sale);
+
+    // Rateia o desconto para os itens da venda (newSale)
+    newSale.prorate();
 
     // Antes de executar o save, chama a função de pré e gera o valor do campo "code"
     await newSale.save();
@@ -173,6 +126,9 @@ exports.update = async (req, res) => {
     sale.items = items;
     sale.comments = comments;
 
+    // Rateia o desconto para os itens da venda (newSale)
+    sale.prorate();
+
     const saleUpd = await sale.save();
     res.status(200).json(saleUpd);
   } catch (error) {
@@ -201,5 +157,15 @@ exports.destroy = async (req, res) => {
   } catch (error) {
     console.error('Erro ao atualizar venda:', error);
     res.status(500).json({ error: 'Erro ao atualizar venda' });
+  }
+};
+
+exports.hasProduct = async (productId) => {
+  try {
+    const sales = await Sale.find({ 'items.product': productId });
+    return sales.length > 0;
+  } catch (error) {
+    console.error('Erro ao verificar vendas do produto:', error);
+    throw new Error('Erro ao verificar vendas do produto');
   }
 };

@@ -1,4 +1,5 @@
 const Product = require('../models/Product');
+const { hasProduct } = require('./SaleController');
 
 exports.index = async (req, res) => {
   try {
@@ -123,6 +124,12 @@ exports.destroy = async (req, res) => {
     const product = await Product.findById(id);
     if (!product) {
       return res.status(404).json({ error: 'Produto não encontrado' });
+    }
+
+    // Verifica se o produto possui vendas associadas
+    const findProduct = await hasProduct(id);
+    if (findProduct) {
+      return res.status(403).json({ error: 'O produto já foi movimentado e não pode ser excluído.' });
     }
 
     // Remove o produto do banco de dados usando o método deleteOne
